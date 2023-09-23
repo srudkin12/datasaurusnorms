@@ -1,0 +1,719 @@
+###############################
+# FIRST RUN DATASAURUS R CODE #
+###############################
+
+# This code requires more memory to execute owing to the large matrices constructed. It is not recommended to run this code unless absolutely necessary.
+
+# We perform the following experiments:
+
+# Experiment 1: Multiply all points by a constant with centering
+# Experiment 2: Shift all points by a constant
+# Experiment 3: Multiply all x1 by a constant with centering
+# Experiment 4: Multiply all points by a constant with no centering
+# Experiment 5: Multiply all x1 by a constant with no centering
+
+# Centering refers to centering the database to have mean 0 prior to performing any multiplication of the point co-ordinates. 
+
+# Update TDA parameters
+
+maxdimension<-1
+maxscale<-6000
+
+###################################################
+# Experiment 1: Multiply all points by a constant #
+###################################################
+
+l01mat<-matrix(0,nrow=500,ncol=14)
+l02mat<-matrix(0,nrow=500,ncol=14)
+l11mat<-matrix(0,nrow=500,ncol=14)
+l12mat<-matrix(0,nrow=500,ncol=14) 
+sd1mat<-matrix(0,nrow=500,ncol=14) # To confirm multiplied by constant
+sd2mat<-matrix(0,nrow=500,ncol=14) # To confirm multiplied by constant
+cormat<-matrix(0,nrow=500,ncol=14) # To confirm unaffected
+maxmat<-matrix(0,nrow=500,ncol=14)
+
+for(g in 1:500){
+ a001<-g/100
+ dx2<-dt2
+ for(j in 1:28){
+  dx2[,j]<-a001*(dt2[,j]-mean(dt2[,j]))
+ }
+ for(i in 1:x001){
+  x002<-2*i-1
+  x003<-2*i
+  x<-as.data.frame(dx2[,x002:x003]) ### Selects the X and Y variables for the relevant dataset
+  Diag <- ripsDiag(X=x, maxdimension, maxscale, library="GUDHI", printProgress=FALSE)
+   dx1<-as.data.frame(print(Diag[["diagram"]]) )
+   dx1<-dx1[2:nrow(dx1),]
+   if(nrow(dx1)>1){names(dx1)<-c("dim","b","d")
+    dx1$pers<-dx1$d-dx1$b
+    dx1$pers2<-dx1$pers^2
+    dx1<-dx1[!is.na(dx1["pers"]),]
+    dx1a<-subset(dx1,dx1$dim==0)
+    dx1a<-dx1a[-1]
+    dx1b<-subset(dx1,dx1$dim==1)
+    l01mat[g,i]<-as.numeric(sum(dx1a$pers)) # L01 Norm
+    l02mat[g,i]<-sqrt(sum(dx1a$pers2)) # L02 Norm
+    l11mat[g,i]<-ifelse(nrow(dx1b)==0,0,sum(dx1b$pers)) # L11 Norm
+    l12mat[g,i]<-ifelse(nrow(dx1b)==0,0,sqrt(sum(dx1b$pers2))) # L12 Norm
+    sd1mat[g,i]<-sd(x[,1])
+    sd2mat[g,i]<-sd(x[,2])
+    cormat[g,i]<-cor(x[,1],x[,2])
+    x004<-nrow(x)-1
+    d001<-0
+    for(j in 1:x004){
+     t1<-x[j,1]
+     t2<-x[j,2]
+     
+     for(k in j:nrow(x)){
+       t3<-x[k,1]
+       t4<-x[k,2]
+       t5<-t3-t1
+       t6<-t4-t2
+       d002<-sqrt(t5^2+t6^2) # distance
+       d001<-ifelse(d002>d001,d002,d001)
+     }
+    }
+   maxmat[g,i]<-d001
+  }
+ }
+}
+
+# We may plot the outcomes to demonstrate the results
+
+l01mat<-as.data.frame(l01mat)
+l02mat<-as.data.frame(l02mat)
+l11mat<-as.data.frame(l11mat)
+l12mat<-as.data.frame(l12mat)
+
+# Store the objects in case running all codes at the same time
+
+e1l01mat<-l01mat
+e1l02mat<-l02mat
+e1l11mat<-l11mat
+e1l12mat<-l12mat
+
+# Create the limits for the plots
+
+l01matm<-max(max(l01mat[,1]),max(l01mat[,2]),max(l01mat[,3]),max(l01mat[,4]),max(l01mat[,5]),max(l01mat[,6]),max(l01mat[,7]),max(l01mat[,8]),max(l01mat[,9]),max(l01mat[,10]),max(l01mat[,11]),max(l01mat[,12]),max(l01mat[,13]),max(l01mat[,14]))
+l02matm<-max(max(l02mat[,1]),max(l02mat[,2]),max(l02mat[,3]),max(l02mat[,4]),max(l02mat[,5]),max(l02mat[,6]),max(l02mat[,7]),max(l02mat[,8]),max(l02mat[,9]),max(l02mat[,10]),max(l02mat[,11]),max(l02mat[,12]),max(l02mat[,13]),max(l02mat[,14]))
+l11matm<-max(max(l11mat[,1]),max(l11mat[,2]),max(l11mat[,3]),max(l11mat[,4]),max(l11mat[,5]),max(l11mat[,6]),max(l11mat[,7]),max(l11mat[,8]),max(l11mat[,9]),max(l11mat[,10]),max(l11mat[,11]),max(l11mat[,12]),max(l11mat[,13]),max(l11mat[,14]))
+l12matm<-max(max(l12mat[,1]),max(l12mat[,2]),max(l12mat[,3]),max(l12mat[,4]),max(l12mat[,5]),max(l12mat[,6]),max(l12mat[,7]),max(l12mat[,8]),max(l12mat[,9]),max(l12mat[,10]),max(l12mat[,11]),max(l12mat[,12]),max(l12mat[,13]),max(l12mat[,14]))
+
+# We work through the 4 persistence norms plotting the effects
+
+names(l01mat)<-c(as.character(dt1t$dataset[i]))
+
+l01mat$a<-seq(from=0.01,to=5,by=0.01)
+
+png("ex1l01.png")
+plot(l01mat$a,l01mat[,1],xlab="Constant",ylab="L01 Persistence Norm",type="l",ylim=c(0,l01matm))
+for(i in 1:14){
+ lines(l01mat$a,l01mat[,i],col="grey60")
+}
+lines(l01mat$a,l01mat[,4],lwd=3)
+dev.off()
+
+names(l02mat)<-c(as.character(dt1t$dataset[i]))
+
+l02mat$a<-seq(from=0.01,to=5,by=0.01)
+
+png("ex1l02.png")
+plot(l02mat$a,l02mat[,1],xlab="Constant",ylab="L02 Persistence Norm",type="l",ylim=c(0,l02matm))
+for(i in 1:14){
+ lines(l02mat$a,l02mat[,i],col="grey60")
+}
+lines(l02mat$a,l02mat[,4],lwd=3)
+dev.off()
+
+names(l11mat)<-c(as.character(dt1t$dataset[i]))
+
+l11mat$a<-seq(from=0.01,to=5,by=0.01)
+
+png("ex1l11.png")
+plot(l11mat$a,l11mat[,1],xlab="Constant",ylab="L11 Persistence Norm",type="l",ylim=c(0,l11matm))
+for(i in 1:14){
+ lines(l11mat$a,l11mat[,i],col="grey60")
+}
+lines(l11mat$a,l11mat[,4],lwd=3)
+dev.off()
+
+names(l12mat)<-c(as.character(dt1t$dataset[i]))
+
+l12mat$a<-seq(from=0.01,to=5,by=0.01)
+
+png("ex1l12.png")
+plot(l12mat$a,l12mat[,1],xlab="Constant",ylab="L12 Persistence Norm",type="l",ylim=c(0,l12matm))
+for(i in 1:14){
+ lines(l12mat$a,l12mat[,i],col="grey60")
+}
+lines(l12mat$a,l12mat[,4],lwd=3)
+dev.off()
+
+plot(l12mat$a,l12mat[,1],xlab="Constant",ylab="L12 Persistence Norm",type="l",ylim=c(0,l12matm))
+for(i in 1:14){
+ lines(l12mat$a,l12mat[,i],col="grey60")
+}
+lines(l12mat$a,l12mat[,4],lwd=3)
+
+
+###################################################
+# Experiment 2: Shift all points by a constant #
+###################################################
+
+l01mat<-matrix(0,nrow=500,ncol=14)
+l02mat<-matrix(0,nrow=500,ncol=14)
+l11mat<-matrix(0,nrow=500,ncol=14)
+l12mat<-matrix(0,nrow=500,ncol=14) 
+sd1mat<-matrix(0,nrow=500,ncol=14) # To confirm multiplied by constant
+sd2mat<-matrix(0,nrow=500,ncol=14) # To confirm multiplied by constant
+cormat<-matrix(0,nrow=500,ncol=14) # To confirm unaffected
+maxmat<-matrix(0,nrow=500,ncol=14)
+
+for(g in 1:500){
+ a001<-g/10-25
+ dx2<-dt2
+ for(j in 1:28){
+  dx2[,j]<-(dt2[,j]-mean(dt2[,j])+a001)
+ }
+ for(i in 1:x001){
+  x002<-2*i-1
+  x003<-2*i
+  x<-as.data.frame(dx2[,x002:x003]) ### Selects the X and Y variables for the relevant dataset
+  Diag <- ripsDiag(X=x, maxdimension, maxscale, library="GUDHI", printProgress=FALSE)
+   dx1<-as.data.frame(print(Diag[["diagram"]]) )
+   dx1<-dx1[2:nrow(dx1),]
+   if(nrow(dx1)>1){names(dx1)<-c("dim","b","d")
+    dx1$pers<-dx1$d-dx1$b
+    dx1$pers2<-dx1$pers^2
+    dx1<-dx1[!is.na(dx1["pers"]),]
+    dx1a<-subset(dx1,dx1$dim==0)
+    dx1a<-dx1a[-1]
+    dx1b<-subset(dx1,dx1$dim==1)
+    l01mat[g,i]<-as.numeric(sum(dx1a$pers)) # L01 Norm
+    l02mat[g,i]<-sqrt(sum(dx1a$pers2)) # L02 Norm
+    l11mat[g,i]<-ifelse(nrow(dx1b)==0,0,sum(dx1b$pers)) # L11 Norm
+    l12mat[g,i]<-ifelse(nrow(dx1b)==0,0,sqrt(sum(dx1b$pers2))) # L12 Norm
+    sd1mat[g,i]<-sd(x[,1])
+    sd2mat[g,i]<-sd(x[,2])
+    cormat[g,i]<-cor(x[,1],x[,2])
+    x004<-nrow(x)-1
+    d001<-0
+    for(j in 1:x004){
+     t1<-x[j,1]
+     t2<-x[j,2]
+     
+     for(k in j:nrow(x)){
+       t3<-x[k,1]
+       t4<-x[k,2]
+       t5<-t3-t1
+       t6<-t4-t2
+       d002<-sqrt(t5^2+t6^2) # distance
+       d001<-ifelse(d002>d001,d002,d001)
+     }
+    }
+   maxmat[g,i]<-d001
+  }
+ }
+}
+
+# We may plot the outcomes to demonstrate the results
+
+l01mat<-as.data.frame(l01mat)
+l02mat<-as.data.frame(l02mat)
+l11mat<-as.data.frame(l11mat)
+l12mat<-as.data.frame(l12mat)
+
+# Store the objects in case running all codes at the same time
+
+e2l01mat<-l01mat
+e2l02mat<-l02mat
+e2l11mat<-l11mat
+e2l12mat<-l12mat
+
+# Create the limits for the plots
+
+l01matm<-max(max(l01mat[,1]),max(l01mat[,2]),max(l01mat[,3]),max(l01mat[,4]),max(l01mat[,5]),max(l01mat[,6]),max(l01mat[,7]),max(l01mat[,8]),max(l01mat[,9]),max(l01mat[,10]),max(l01mat[,11]),max(l01mat[,12]),max(l01mat[,13]),max(l01mat[,14]))
+l02matm<-max(max(l02mat[,1]),max(l02mat[,2]),max(l02mat[,3]),max(l02mat[,4]),max(l02mat[,5]),max(l02mat[,6]),max(l02mat[,7]),max(l02mat[,8]),max(l02mat[,9]),max(l02mat[,10]),max(l02mat[,11]),max(l02mat[,12]),max(l02mat[,13]),max(l02mat[,14]))
+l11matm<-max(max(l11mat[,1]),max(l11mat[,2]),max(l11mat[,3]),max(l11mat[,4]),max(l11mat[,5]),max(l11mat[,6]),max(l11mat[,7]),max(l11mat[,8]),max(l11mat[,9]),max(l11mat[,10]),max(l11mat[,11]),max(l11mat[,12]),max(l11mat[,13]),max(l11mat[,14]))
+l12matm<-max(max(l12mat[,1]),max(l12mat[,2]),max(l12mat[,3]),max(l12mat[,4]),max(l12mat[,5]),max(l12mat[,6]),max(l12mat[,7]),max(l12mat[,8]),max(l12mat[,9]),max(l12mat[,10]),max(l12mat[,11]),max(l12mat[,12]),max(l12mat[,13]),max(l12mat[,14]))
+
+# We work through the 4 persistence norms plotting the effects
+
+names(l01mat)<-c(as.character(dt1t$dataset[i]))
+
+l01mat$a<-seq(from=0.01,to=5,by=0.01)
+
+png("ex2l01.png")
+plot(l01mat$a,l01mat[,1],xlab="Constant",ylab="L01 Persistence Norm",type="l",ylim=c(0,l01matm))
+for(i in 1:14){
+ lines(l01mat$a,l01mat[,i],col="grey60")
+}
+lines(l01mat$a,l01mat[,4],lwd=3)
+dev.off()
+
+names(l02mat)<-c(as.character(dt1t$dataset[i]))
+
+l02mat$a<-seq(from=0.01,to=5,by=0.01)
+
+png("ex2l02.png")
+plot(l02mat$a,l02mat[,1],xlab="Constant",ylab="L02 Persistence Norm",type="l",ylim=c(0,l02matm))
+for(i in 1:14){
+ lines(l02mat$a,l02mat[,i],col="grey60")
+}
+lines(l02mat$a,l02mat[,4],lwd=3)
+dev.off()
+
+names(l11mat)<-c(as.character(dt1t$dataset[i]))
+
+l11mat$a<-seq(from=0.01,to=5,by=0.01)
+
+png("ex2l11.png")
+plot(l11mat$a,l11mat[,1],xlab="Constant",ylab="L11 Persistence Norm",type="l",ylim=c(0,l11matm))
+for(i in 1:14){
+ lines(l11mat$a,l11mat[,i],col="grey60")
+}
+lines(l11mat$a,l11mat[,4],lwd=3)
+dev.off()
+
+names(l12mat)<-c(as.character(dt1t$dataset[i]))
+
+l12mat$a<-seq(from=0.01,to=5,by=0.01)
+
+png("ex2l12.png")
+plot(l12mat$a,l12mat[,1],xlab="Constant",ylab="L12 Persistence Norm",type="l",ylim=c(0,l12matm))
+for(i in 1:14){
+ lines(l12mat$a,l12mat[,i],col="grey60")
+}
+lines(l12mat$a,l12mat[,4],lwd=3)
+dev.off()
+
+plot(l12mat$a,l12mat[,1],xlab="Constant",ylab="L12 Persistence Norm",type="l",ylim=c(0,l12matm))
+for(i in 1:14){
+ lines(l12mat$a,l12mat[,i],col="grey60")
+}
+lines(l12mat$a,l12mat[,4],lwd=3)
+
+###################################################
+# Experiment 3: Multiply all x1 by a constant #
+###################################################
+
+l01mat<-matrix(0,nrow=500,ncol=14)
+l02mat<-matrix(0,nrow=500,ncol=14)
+l11mat<-matrix(0,nrow=500,ncol=14)
+l12mat<-matrix(0,nrow=500,ncol=14) 
+sd1mat<-matrix(0,nrow=500,ncol=14) # To confirm multiplied by constant
+sd2mat<-matrix(0,nrow=500,ncol=14) # To confirm multiplied by constant
+cormat<-matrix(0,nrow=500,ncol=14) # To confirm unaffected
+maxmat<-matrix(0,nrow=500,ncol=14)
+
+for(g in 1:500){
+ a001<-g/100
+ dx2<-dt2
+ for(j in 1:28){
+  dx2[,j]<-dt2[,j]-mean(dt2[,j])
+ }
+ for(j in 1:14){
+  a002<-2*j
+  a002<-a002-1
+  dx2[,a002]<-a001*dt2[,a002]
+ }
+ for(i in 1:x001){
+  x002<-2*i-1
+  x003<-2*i
+  x<-as.data.frame(dx2[,x002:x003]) ### Selects the X and Y variables for the relevant dataset
+  Diag <- ripsDiag(X=x, maxdimension, maxscale, library="GUDHI", printProgress=FALSE)
+   dx1<-as.data.frame(print(Diag[["diagram"]]) )
+   dx1<-dx1[2:nrow(dx1),]
+   if(nrow(dx1)>1){names(dx1)<-c("dim","b","d")
+    dx1$pers<-dx1$d-dx1$b
+    dx1$pers2<-dx1$pers^2
+    dx1<-dx1[!is.na(dx1["pers"]),]
+    dx1a<-subset(dx1,dx1$dim==0)
+    dx1a<-dx1a[-1]
+    dx1b<-subset(dx1,dx1$dim==1)
+    l01mat[g,i]<-as.numeric(sum(dx1a$pers)) # L01 Norm
+    l02mat[g,i]<-sqrt(sum(dx1a$pers2)) # L02 Norm
+    l11mat[g,i]<-ifelse(nrow(dx1b)==0,0,sum(dx1b$pers)) # L11 Norm
+    l12mat[g,i]<-ifelse(nrow(dx1b)==0,0,sqrt(sum(dx1b$pers2))) # L12 Norm
+    sd1mat[g,i]<-sd(x[,1])
+    sd2mat[g,i]<-sd(x[,2])
+    cormat[g,i]<-cor(x[,1],x[,2])
+    x004<-nrow(x)-1
+    d001<-0
+    for(j in 1:x004){
+     t1<-x[j,1]
+     t2<-x[j,2]
+     
+     for(k in j:nrow(x)){
+       t3<-x[k,1]
+       t4<-x[k,2]
+       t5<-t3-t1
+       t6<-t4-t2
+       d002<-sqrt(t5^2+t6^2) # distance
+       d001<-ifelse(d002>d001,d002,d001)
+     }
+    }
+   maxmat[g,i]<-d001
+  }
+ }
+}
+
+# We may plot the outcomes to demonstrate the results
+
+l01mat<-as.data.frame(l01mat)
+l02mat<-as.data.frame(l02mat)
+l11mat<-as.data.frame(l11mat)
+l12mat<-as.data.frame(l12mat)
+
+# Store the objects in case running all codes at the same time
+
+e3l01mat<-l01mat
+e3l02mat<-l02mat
+e3l11mat<-l11mat
+e3l12mat<-l12mat
+
+# Create the limits for the plots
+
+l01matm<-max(max(l01mat[,1]),max(l01mat[,2]),max(l01mat[,3]),max(l01mat[,4]),max(l01mat[,5]),max(l01mat[,6]),max(l01mat[,7]),max(l01mat[,8]),max(l01mat[,9]),max(l01mat[,10]),max(l01mat[,11]),max(l01mat[,12]),max(l01mat[,13]),max(l01mat[,14]))
+l02matm<-max(max(l02mat[,1]),max(l02mat[,2]),max(l02mat[,3]),max(l02mat[,4]),max(l02mat[,5]),max(l02mat[,6]),max(l02mat[,7]),max(l02mat[,8]),max(l02mat[,9]),max(l02mat[,10]),max(l02mat[,11]),max(l02mat[,12]),max(l02mat[,13]),max(l02mat[,14]))
+l11matm<-max(max(l11mat[,1]),max(l11mat[,2]),max(l11mat[,3]),max(l11mat[,4]),max(l11mat[,5]),max(l11mat[,6]),max(l11mat[,7]),max(l11mat[,8]),max(l11mat[,9]),max(l11mat[,10]),max(l11mat[,11]),max(l11mat[,12]),max(l11mat[,13]),max(l11mat[,14]))
+l12matm<-max(max(l12mat[,1]),max(l12mat[,2]),max(l12mat[,3]),max(l12mat[,4]),max(l12mat[,5]),max(l12mat[,6]),max(l12mat[,7]),max(l12mat[,8]),max(l12mat[,9]),max(l12mat[,10]),max(l12mat[,11]),max(l12mat[,12]),max(l12mat[,13]),max(l12mat[,14]))
+
+# We work through the 4 persistence norms plotting the effects
+
+names(l01mat)<-c(as.character(dt1t$dataset[i]))
+
+l01mat$a<-seq(from=0.01,to=5,by=0.01)
+
+png("ex3l01.png")
+plot(l01mat$a,l01mat[,1],xlab="Constant",ylab="L01 Persistence Norm",type="l",ylim=c(0,l01matm))
+for(i in 1:14){
+ lines(l01mat$a,l01mat[,i],col="grey60")
+}
+lines(l01mat$a,l01mat[,4],lwd=3)
+dev.off()
+
+names(l02mat)<-c(as.character(dt1t$dataset[i]))
+
+l02mat$a<-seq(from=0.01,to=5,by=0.01)
+
+png("ex3l02.png")
+plot(l02mat$a,l02mat[,1],xlab="Constant",ylab="L02 Persistence Norm",type="l",ylim=c(0,l02matm))
+for(i in 1:14){
+ lines(l02mat$a,l02mat[,i],col="grey60")
+}
+lines(l02mat$a,l02mat[,4],lwd=3)
+dev.off()
+
+names(l11mat)<-c(as.character(dt1t$dataset[i]))
+
+l11mat$a<-seq(from=0.01,to=5,by=0.01)
+
+png("ex3l11.png")
+plot(l11mat$a,l11mat[,1],xlab="Constant",ylab="L11 Persistence Norm",type="l",ylim=c(0,l11matm))
+for(i in 1:14){
+ lines(l11mat$a,l11mat[,i],col="grey60")
+}
+lines(l11mat$a,l11mat[,4],lwd=3)
+dev.off()
+
+names(l12mat)<-c(as.character(dt1t$dataset[i]))
+
+l12mat$a<-seq(from=0.01,to=5,by=0.01)
+
+png("ex3l12.png")
+plot(l12mat$a,l12mat[,1],xlab="Constant",ylab="L12 Persistence Norm",type="l",ylim=c(0,l12matm))
+for(i in 1:14){
+ lines(l12mat$a,l12mat[,i],col="grey60")
+}
+lines(l12mat$a,l12mat[,4],lwd=3)
+dev.off()
+
+plot(l12mat$a,l12mat[,1],xlab="Constant",ylab="L12 Persistence Norm",type="l")
+for(i in 1:14){
+ lines(l12mat$a,l12mat[,i],col="grey60")
+}
+lines(l12mat$a,l12mat[,4],lwd=3)
+# Update TDA parameters
+
+maxdimension<-1
+maxscale<-6000
+
+#####################################################################
+# Experiment 4: Multiply all points by a constant with no centering #
+#####################################################################
+
+l01mat<-matrix(0,nrow=500,ncol=14)
+l02mat<-matrix(0,nrow=500,ncol=14)
+l11mat<-matrix(0,nrow=500,ncol=14)
+l12mat<-matrix(0,nrow=500,ncol=14) 
+sd1mat<-matrix(0,nrow=500,ncol=14) # To confirm multiplied by constant
+sd2mat<-matrix(0,nrow=500,ncol=14) # To confirm multiplied by constant
+cormat<-matrix(0,nrow=500,ncol=14) # To confirm unaffected
+maxmat<-matrix(0,nrow=500,ncol=14)
+
+for(g in 1:500){
+ a001<-g/100
+ dx2<-dt2
+ for(j in 1:28){
+  dx2[,j]<-a001*dt2[,j]
+ }
+ for(i in 1:x001){
+  x002<-2*i-1
+  x003<-2*i
+  x<-as.data.frame(dx2[,x002:x003]) ### Selects the X and Y variables for the relevant dataset
+  Diag <- ripsDiag(X=x, maxdimension, maxscale, library="GUDHI", printProgress=FALSE)
+   dx1<-as.data.frame(print(Diag[["diagram"]]) )
+   dx1<-dx1[2:nrow(dx1),]
+   if(nrow(dx1)>1){names(dx1)<-c("dim","b","d")
+    dx1$pers<-dx1$d-dx1$b
+    dx1$pers2<-dx1$pers^2
+    dx1<-dx1[!is.na(dx1["pers"]),]
+    dx1a<-subset(dx1,dx1$dim==0)
+    dx1a<-dx1a[-1]
+    dx1b<-subset(dx1,dx1$dim==1)
+    l01mat[g,i]<-as.numeric(sum(dx1a$pers)) # L01 Norm
+    l02mat[g,i]<-sqrt(sum(dx1a$pers2)) # L02 Norm
+    l11mat[g,i]<-ifelse(nrow(dx1b)==0,0,sum(dx1b$pers)) # L11 Norm
+    l12mat[g,i]<-ifelse(nrow(dx1b)==0,0,sqrt(sum(dx1b$pers2))) # L12 Norm
+    sd1mat[g,i]<-sd(x[,1])
+    sd2mat[g,i]<-sd(x[,2])
+    cormat[g,i]<-cor(x[,1],x[,2])
+    x004<-nrow(x)-1
+    d001<-0
+    for(j in 1:x004){
+     t1<-x[j,1]
+     t2<-x[j,2]
+     
+     for(k in j:nrow(x)){
+       t3<-x[k,1]
+       t4<-x[k,2]
+       t5<-t3-t1
+       t6<-t4-t2
+       d002<-sqrt(t5^2+t6^2) # distance
+       d001<-ifelse(d002>d001,d002,d001)
+     }
+    }
+   maxmat[g,i]<-d001
+  }
+ }
+}
+
+# We may plot the outcomes to demonstrate the results
+
+l01mat<-as.data.frame(l01mat)
+l02mat<-as.data.frame(l02mat)
+l11mat<-as.data.frame(l11mat)
+l12mat<-as.data.frame(l12mat)
+
+# Store the objects in case running all codes at the same time
+
+e4l01mat<-l01mat
+e4l02mat<-l02mat
+e4l11mat<-l11mat
+e4l12mat<-l12mat
+
+# Create the limits for the plots
+
+l01matm<-max(max(l01mat[,1]),max(l01mat[,2]),max(l01mat[,3]),max(l01mat[,4]),max(l01mat[,5]),max(l01mat[,6]),max(l01mat[,7]),max(l01mat[,8]),max(l01mat[,9]),max(l01mat[,10]),max(l01mat[,11]),max(l01mat[,12]),max(l01mat[,13]),max(l01mat[,14]))
+l02matm<-max(max(l02mat[,1]),max(l02mat[,2]),max(l02mat[,3]),max(l02mat[,4]),max(l02mat[,5]),max(l02mat[,6]),max(l02mat[,7]),max(l02mat[,8]),max(l02mat[,9]),max(l02mat[,10]),max(l02mat[,11]),max(l02mat[,12]),max(l02mat[,13]),max(l02mat[,14]))
+l11matm<-max(max(l11mat[,1]),max(l11mat[,2]),max(l11mat[,3]),max(l11mat[,4]),max(l11mat[,5]),max(l11mat[,6]),max(l11mat[,7]),max(l11mat[,8]),max(l11mat[,9]),max(l11mat[,10]),max(l11mat[,11]),max(l11mat[,12]),max(l11mat[,13]),max(l11mat[,14]))
+l12matm<-max(max(l12mat[,1]),max(l12mat[,2]),max(l12mat[,3]),max(l12mat[,4]),max(l12mat[,5]),max(l12mat[,6]),max(l12mat[,7]),max(l12mat[,8]),max(l12mat[,9]),max(l12mat[,10]),max(l12mat[,11]),max(l12mat[,12]),max(l12mat[,13]),max(l12mat[,14]))
+
+# We work through the 4 persistence norms plotting the effects
+
+names(l01mat)<-c(as.character(dt1t$dataset[i]))
+
+l01mat$a<-seq(from=0.01,to=5,by=0.01)
+
+png("ex4l01.png")
+plot(l01mat$a,l01mat[,1],xlab="Constant",ylab="L01 Persistence Norm",type="l",ylim=c(0,l01matm))
+for(i in 1:14){
+ lines(l01mat$a,l01mat[,i],col="grey60")
+}
+lines(l01mat$a,l01mat[,4],lwd=3)
+dev.off()
+
+names(l02mat)<-c(as.character(dt1t$dataset[i]))
+
+l02mat$a<-seq(from=0.01,to=5,by=0.01)
+
+png("ex4l02.png")
+plot(l02mat$a,l02mat[,1],xlab="Constant",ylab="L02 Persistence Norm",type="l",ylim=c(0,l02matm))
+for(i in 1:14){
+ lines(l02mat$a,l02mat[,i],col="grey60")
+}
+lines(l02mat$a,l02mat[,4],lwd=3)
+dev.off()
+
+names(l11mat)<-c(as.character(dt1t$dataset[i]))
+
+l11mat$a<-seq(from=0.01,to=5,by=0.01)
+
+png("ex4l11.png")
+plot(l11mat$a,l11mat[,1],xlab="Constant",ylab="L11 Persistence Norm",type="l",ylim=c(0,l11matm))
+for(i in 1:14){
+ lines(l11mat$a,l11mat[,i],col="grey60")
+}
+lines(l11mat$a,l11mat[,4],lwd=3)
+dev.off()
+
+names(l12mat)<-c(as.character(dt1t$dataset[i]))
+
+l12mat$a<-seq(from=0.01,to=5,by=0.01)
+
+png("ex4l12.png")
+plot(l12mat$a,l12mat[,1],xlab="Constant",ylab="L12 Persistence Norm",type="l",ylim=c(0,l12matm))
+for(i in 1:14){
+ lines(l12mat$a,l12mat[,i],col="grey60")
+}
+lines(l12mat$a,l12mat[,4],lwd=3)
+dev.off()
+
+plot(l12mat$a,l12mat[,1],xlab="Constant",ylab="L12 Persistence Norm",type="l",ylim=c(0,l12matm))
+for(i in 1:14){
+ lines(l12mat$a,l12mat[,i],col="grey60")
+}
+lines(l12mat$a,l12mat[,4],lwd=3)
+
+
+#################################################################
+# Experiment 5: Multiply all x1 by a constant with no centering #
+#################################################################
+
+l01mat<-matrix(0,nrow=500,ncol=14)
+l02mat<-matrix(0,nrow=500,ncol=14)
+l11mat<-matrix(0,nrow=500,ncol=14)
+l12mat<-matrix(0,nrow=500,ncol=14) 
+sd1mat<-matrix(0,nrow=500,ncol=14) # To confirm multiplied by constant
+sd2mat<-matrix(0,nrow=500,ncol=14) # To confirm multiplied by constant
+cormat<-matrix(0,nrow=500,ncol=14) # To confirm unaffected
+maxmat<-matrix(0,nrow=500,ncol=14)
+
+for(g in 1:500){
+ a001<-g/100
+ dx2<-dt2
+ for(j in 1:14){
+  a002<-2*j
+  a002<-a002-1
+  dx2[,a002]<-a001*dt2[,a002]
+ }
+ for(i in 1:x001){
+  x002<-2*i-1
+  x003<-2*i
+  x<-as.data.frame(dx2[,x002:x003]) ### Selects the X and Y variables for the relevant dataset
+  Diag <- ripsDiag(X=x, maxdimension, maxscale, library="GUDHI", printProgress=FALSE)
+   dx1<-as.data.frame(print(Diag[["diagram"]]) )
+   dx1<-dx1[2:nrow(dx1),]
+   if(nrow(dx1)>1){names(dx1)<-c("dim","b","d")
+    dx1$pers<-dx1$d-dx1$b
+    dx1$pers2<-dx1$pers^2
+    dx1<-dx1[!is.na(dx1["pers"]),]
+    dx1a<-subset(dx1,dx1$dim==0)
+    dx1a<-dx1a[-1]
+    dx1b<-subset(dx1,dx1$dim==1)
+    l01mat[g,i]<-as.numeric(sum(dx1a$pers)) # L01 Norm
+    l02mat[g,i]<-sqrt(sum(dx1a$pers2)) # L02 Norm
+    l11mat[g,i]<-ifelse(nrow(dx1b)==0,0,sum(dx1b$pers)) # L11 Norm
+    l12mat[g,i]<-ifelse(nrow(dx1b)==0,0,sqrt(sum(dx1b$pers2))) # L12 Norm
+    sd1mat[g,i]<-sd(x[,1])
+    sd2mat[g,i]<-sd(x[,2])
+    cormat[g,i]<-cor(x[,1],x[,2])
+    x004<-nrow(x)-1
+    d001<-0
+    for(j in 1:x004){
+     t1<-x[j,1]
+     t2<-x[j,2]
+     
+     for(k in j:nrow(x)){
+       t3<-x[k,1]
+       t4<-x[k,2]
+       t5<-t3-t1
+       t6<-t4-t2
+       d002<-sqrt(t5^2+t6^2) # distance
+       d001<-ifelse(d002>d001,d002,d001)
+     }
+    }
+   maxmat[g,i]<-d001
+  }
+ }
+}
+
+# We may plot the outcomes to demonstrate the results
+
+l01mat<-as.data.frame(l01mat)
+l02mat<-as.data.frame(l02mat)
+l11mat<-as.data.frame(l11mat)
+l12mat<-as.data.frame(l12mat)
+
+# Store the objects in case running all codes at the same time
+
+e5l01mat<-l01mat
+e5l02mat<-l02mat
+e5l11mat<-l11mat
+e5l12mat<-l12mat
+
+# Create the limits for the plots
+
+l01matm<-max(max(l01mat[,1]),max(l01mat[,2]),max(l01mat[,3]),max(l01mat[,4]),max(l01mat[,5]),max(l01mat[,6]),max(l01mat[,7]),max(l01mat[,8]),max(l01mat[,9]),max(l01mat[,10]),max(l01mat[,11]),max(l01mat[,12]),max(l01mat[,13]),max(l01mat[,14]))
+l02matm<-max(max(l02mat[,1]),max(l02mat[,2]),max(l02mat[,3]),max(l02mat[,4]),max(l02mat[,5]),max(l02mat[,6]),max(l02mat[,7]),max(l02mat[,8]),max(l02mat[,9]),max(l02mat[,10]),max(l02mat[,11]),max(l02mat[,12]),max(l02mat[,13]),max(l02mat[,14]))
+l11matm<-max(max(l11mat[,1]),max(l11mat[,2]),max(l11mat[,3]),max(l11mat[,4]),max(l11mat[,5]),max(l11mat[,6]),max(l11mat[,7]),max(l11mat[,8]),max(l11mat[,9]),max(l11mat[,10]),max(l11mat[,11]),max(l11mat[,12]),max(l11mat[,13]),max(l11mat[,14]))
+l12matm<-max(max(l12mat[,1]),max(l12mat[,2]),max(l12mat[,3]),max(l12mat[,4]),max(l12mat[,5]),max(l12mat[,6]),max(l12mat[,7]),max(l12mat[,8]),max(l12mat[,9]),max(l12mat[,10]),max(l12mat[,11]),max(l12mat[,12]),max(l12mat[,13]),max(l12mat[,14]))
+
+# We work through the 4 persistence norms plotting the effects
+
+names(l01mat)<-c(as.character(dt1t$dataset[i]))
+
+l01mat$a<-seq(from=0.01,to=5,by=0.01)
+
+png("ex5l01.png")
+plot(l01mat$a,l01mat[,1],xlab="Constant",ylab="L01 Persistence Norm",type="l",ylim=c(0,l01matm))
+for(i in 1:14){
+ lines(l01mat$a,l01mat[,i],col="grey60")
+}
+lines(l01mat$a,l01mat[,4],lwd=3)
+dev.off()
+
+names(l02mat)<-c(as.character(dt1t$dataset[i]))
+
+l02mat$a<-seq(from=0.01,to=5,by=0.01)
+
+png("ex5l02.png")
+plot(l02mat$a,l02mat[,1],xlab="Constant",ylab="L02 Persistence Norm",type="l",ylim=c(0,l02matm))
+for(i in 1:14){
+ lines(l02mat$a,l02mat[,i],col="grey60")
+}
+lines(l02mat$a,l02mat[,4],lwd=3)
+dev.off()
+
+names(l11mat)<-c(as.character(dt1t$dataset[i]))
+
+l11mat$a<-seq(from=0.01,to=5,by=0.01)
+
+png("ex5l11.png")
+plot(l11mat$a,l11mat[,1],xlab="Constant",ylab="L11 Persistence Norm",type="l",ylim=c(0,l11matm))
+for(i in 1:14){
+ lines(l11mat$a,l11mat[,i],col="grey60")
+}
+lines(l11mat$a,l11mat[,4],lwd=3)
+dev.off()
+
+names(l12mat)<-c(as.character(dt1t$dataset[i]))
+
+l12mat$a<-seq(from=0.01,to=5,by=0.01)
+
+png("ex5l12.png")
+plot(l12mat$a,l12mat[,1],xlab="Constant",ylab="L12 Persistence Norm",type="l",ylim=c(0,l12matm))
+for(i in 1:14){
+ lines(l12mat$a,l12mat[,i],col="grey60")
+}
+lines(l12mat$a,l12mat[,4],lwd=3)
+dev.off()
+
+plot(l12mat$a,l12mat[,1],xlab="Constant",ylab="L12 Persistence Norm",type="l",ylim=c(0,l12matm))
+for(i in 1:14){
+ lines(l12mat$a,l12mat[,i],col="grey60")
+}
+lines(l12mat$a,l12mat[,4],lwd=3)
+# Update TDA parameters

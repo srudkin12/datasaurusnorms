@@ -1,0 +1,573 @@
+#########################################################################################################################
+# This code produces sections 3 and 4 of the paper Dlotko and Rudkin (2023) "Persistence Norms and the Datasaurus"	#
+# If using this code then please be sure to cite the paper as it appears on Arxiv					#
+# Note that this code MUST be run prior to running the experiments code							#
+# INTERNET CONNECTION IS REQUIRED											#
+#########################################################################################################################
+
+
+
+# Load packages
+
+library(datasauRus)
+library(TDA)
+library(readstata13)
+library(dplyr)
+library(ggplot2)
+library(MASS)
+library(boot)
+library(moments)
+
+### Set parameters for TDA
+
+maxdimension<-1
+maxscale<-60
+
+### Set working directory
+
+setwd("D://datasaurus/") # This directory must be updated for your code
+
+
+#########################################################################################################
+# The first section of code is provided by the vignette to the datasauRus package 			#
+# Please ensure the correct citation: Rhian Davies, Steph Locke and Lucy D'Agostino McGowan (2022).	#
+#  datasauRus: Datasets from the Datasaurus Dozen. R package version					#
+#  0.1.6. https://CRAN.R-project.org/package=datasauRus							#
+#########################################################################################################
+
+# Confirm summary statistics 
+
+if(requireNamespace("dplyr")){
+  suppressPackageStartupMessages(library(dplyr))
+  datasaurus_dozen %>% 
+    group_by(dataset) %>% 
+    summarize(
+      mean_x    = mean(x),
+      mean_y    = mean(y),
+      std_dev_x = sd(x),
+      std_dev_y = sd(y),
+      corr_x_y  = cor(x, y)
+    )
+}
+
+# View plots
+
+if(requireNamespace("ggplot2")){
+  library(ggplot2)
+  ggplot(datasaurus_dozen, aes(x = x, y = y, colour = dataset))+
+    geom_point()+
+    theme_void()+
+    theme(legend.position = "none")+
+    facet_wrap(~dataset, ncol = 3)
+}
+
+##############################################
+# First convert the data to the right format #
+##############################################
+
+dt1<-as.data.frame(datasaurus_dozen)
+
+# Create a table of dataset names
+
+dt1t<-as.data.frame(table(dt1$dataset))
+names(dt1t)<-c("dataset","freq")
+
+# Store number of datasets
+
+x001<-nrow(dt1t)
+
+# Convert wide table so each dataset is in its own block
+
+dt2<-as.data.frame(datasaurus_dozen_wide)
+
+#########################
+# Normal distribution	#
+#########################
+
+# Specify mean and standard deviation
+
+mu <- c(54.26,47.83)
+stddev <- c(16.77,26.93)
+
+# Specify correlation matrix
+
+corMat <- matrix(c(1, -0.064, -0.064, 1),
+                 ncol = 2)
+
+# Form the covarianve matrix
+
+covMat <- stddev %*% t(stddev) * corMat
+
+# Use random normal generator 
+
+for(i in 1:5000000){
+ dat2 <- mvrnorm(n = 142, mu = mu, Sigma = covMat, empirical = TRUE)
+ if(min(dat2[,1])>0 & min(dat2[,2])>0 & max(dat2[,1])<110 & max(dat2[,2])<110){break}
+}
+
+# bind with dt2
+
+dt2<-as.data.frame(cbind.data.frame(dt2,dat2))
+
+names(dt2)[27]<-"normal_x"
+names(dt2)[28]<-"normal_y"
+
+# Add additional dataset by adding to x001
+
+x001<-x001+1
+
+# Add row to dt1
+
+dt1ta<-as.data.frame(matrix(0,nrow=1,ncol=2))
+names(dt1ta)<-c("dataset","freq")
+
+dt1ta$dataset[1]<-"normal"
+dt1ta$freq[1]<-142
+
+dt1t<-as.data.frame(rbind.data.frame(dt1t,dt1ta))
+
+# Create matrix for storing data
+
+dcol<-matrix(0,nrow=x001,ncol=13)
+
+#########################
+# Summary statistics	#
+#########################
+
+# For this we will use the following function which was written by Simon Rudkin in 2020. Any similarity to an existing function is coincidental, but if there is a match please inform me so that I can give correct attribution/
+
+# For summary statistics there are four functions depending on the level of detail required
+
+sstatsmat<-function(characteristics,decp){
+ if(missing(decp)) decp <- 2
+ a001<-ncol(characteristics)
+ sstats<-matrix(0,nrow=a001,ncol=5)
+ for(i in 1:a001){
+  j<-i
+  sstats[i,1]<-names(characteristics)[j]
+  sstats[i,2]<-round(mean(characteristics[,j]),decp)
+  sstats[i,3]<-round(sd(characteristics[,j]),decp)
+  sstats[i,4]<-round(min(characteristics[,j]),decp)
+  sstats[i,5]<-round(max(characteristics[,j]),decp)
+ }
+ return(sstats)
+}
+
+sstatsmatdet<-function(characteristics,decp){
+ if(missing(decp)) decp <- 2
+ a001<-ncol(characteristics)
+ sstats<-matrix(0,nrow=a001,ncol=8)
+ for(i in 1:a001){
+  j<-i
+  sstats[i,1]<-names(characteristics)[j]
+  sstats[i,2]<-round(mean(characteristics[,j]),decp)
+  sstats[i,3]<-round(sd(characteristics[,j]),decp)
+  sstats[i,4]<-round(min(characteristics[,j]),decp)
+  sstats[i,5]<-round(quantile(characteristics[,j],0.25),decp)
+  sstats[i,6]<-round(quantile(characteristics[,j],0.50),decp)
+  sstats[i,7]<-round(quantile(characteristics[,j],0.75),decp)
+  sstats[i,8]<-round(max(characteristics[,j]),decp)
+ }
+ return(sstats)
+}
+
+s001<-sstatsmatdet(dt2)
+
+# Correlation matrix function
+
+corm<-function(vec,n,spear){
+ if(missing(spear)){spear<-"FALSE"}
+ if(missing(n)){n<-2}
+ a101<-ncol(vec)
+ m001a<-matrix(0,nrow=a101,ncol=a101)
+ print(paste0("Rows: ",a101," Cols: ",a101))
+ for(i in 1:a101){
+  for(j in 1:a101){
+   a201<-cor(vec[,i],vec[,j])
+   a202<-cor(vec[,i],vec[,j],method="spearman")
+   m001a[i,j]<-ifelse(i>=j,a201,a202) ### Determines which number to put in the matrix
+  }
+ }
+ for(i in 1:a101){
+  for(j in 1:a101){
+    m001a[i,j]<-round(m001a[i,j],n)
+  }
+ }
+ a103<-a101-1
+ for(i in 1:a103){
+  a104<-i+1
+  for(j in a104:4){
+   m001a[i,j]<-ifelse(spear==TRUE,m001a[i,j],"") 
+  }
+ }
+ for(i in 1:a101){
+  m001a[i,i]<-1
+ }
+ return(m001a)
+}
+
+
+
+# We then need the latout function
+
+latout<-function(data,filename){
+ if(missing(filename)) filename<-"latout.txt"
+ a001<-nrow(data)
+ a002<-ncol(data)
+ a003<-a002-1
+ mat1<-matrix(0,nrow=a001,ncol=1)
+ for(i in 1:a001){
+   for(k in 1:a003){
+     mat1[i,1]<-paste(mat1[i,1],data[i,k],sep="&")
+   }
+ }
+ for(i in 1:a001){
+  mat1[i,1]<-paste0(mat1[i,1],"&",data[i,a002],"\\","\\")
+ }
+ write.table(as.data.frame(mat1),filename,sep="\n",row.names=FALSE,quote=FALSE)
+} 
+
+latout(s001,"DatasaurusSummaryStats.txt")
+
+#########################################
+# Scatter plots for Figure 2		#
+#########################################
+
+# Create scatter plots labelling variables X1 and X2	
+
+png("datasaurus1.png")
+plot(dt2[,1],dt2[,2],pch=16,xlab="X_1",ylab="X_2",xlim=c(0,110),ylim=c(0,110))
+dev.off()
+
+png("datasaurus2.png")
+plot(dt2[,3],dt2[,4],pch=16,xlab="X_1",ylab="X_2",xlim=c(0,110),ylim=c(0,110))
+dev.off()
+
+png("datasaurus3.png")
+plot(dt2[,5],dt2[,6],pch=16,xlab="X_1",ylab="X_2",xlim=c(0,110),ylim=c(0,110))
+dev.off()
+
+png("datasaurus4.png")
+plot(dt2[,7],dt2[,8],pch=16,xlab="X_1",ylab="X_2",xlim=c(0,110),ylim=c(0,110))
+dev.off()
+
+png("datasaurus5.png")
+plot(dt2[,9],dt2[,10],pch=16,xlab="X_1",ylab="X_2",xlim=c(0,110),ylim=c(0,110))
+dev.off()
+
+png("datasaurus6.png")
+plot(dt2[,11],dt2[,12],pch=16,xlab="X_1",ylab="X_2",xlim=c(0,110),ylim=c(0,110))
+dev.off()
+
+png("datasaurus7.png")
+plot(dt2[,13],dt2[,14],pch=16,xlab="X_1",ylab="X_2",xlim=c(0,110),ylim=c(0,110))
+dev.off()
+
+png("datasaurus8.png")
+plot(dt2[,15],dt2[,16],pch=16,xlab="X_1",ylab="X_2",xlim=c(0,110),ylim=c(0,110))
+dev.off()
+
+png("datasaurus9.png")
+plot(dt2[,17],dt2[,18],pch=16,xlab="X_1",ylab="X_2",xlim=c(0,110),ylim=c(0,110))
+dev.off()
+
+png("datasaurus10.png")
+plot(dt2[,19],dt2[,20],pch=16,xlab="X_1",ylab="X_2",xlim=c(0,110),ylim=c(0,110))
+dev.off()
+
+png("datasaurus11.png")
+plot(dt2[,21],dt2[,22],pch=16,xlab="X_1",ylab="X_2",xlim=c(0,110),ylim=c(0,110))
+dev.off()
+
+png("datasaurus12.png")
+plot(dt2[,23],dt2[,24],pch=16,xlab="X_1",ylab="X_2",xlim=c(0,110),ylim=c(0,110))
+dev.off()
+png("datasaurus13.png")
+plot(dt2[,25],dt2[,26],pch=16,xlab="X_1",ylab="X_2",xlim=c(0,110),ylim=c(0,110))
+dev.off()
+
+png("datasaurus14.png")
+plot(dat2[,1],dat2[,2],pch=16,xlab="X_1",ylab="X_2",xlim=c(0,110),ylim=c(0,110)) # Normal dataset still exists as dat2 from earlier.
+dev.off()
+
+###########################
+# Histograms for Figure 5 #
+###########################
+
+png("datasaurus1a.png")
+hist(dt2[,1],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus1b.png")
+hist(dt2[,2],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus2a.png")
+hist(dt2[,3],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus2b.png")
+hist(dt2[,4],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus3a.png")
+hist(dt2[,5],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus3b.png")
+hist(dt2[,6],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus4a.png")
+hist(dt2[,7],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus4b.png")
+hist(dt2[,8],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus5a.png")
+hist(dt2[,9],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus5b.png")
+hist(dt2[,10],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus6a.png")
+hist(dt2[,11],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus6b.png")
+hist(dt2[,12],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus7a.png")
+hist(dt2[,13],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus7b.png")
+hist(dt2[,14],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus8a.png")
+hist(dt2[,15],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus8b.png")
+hist(dt2[,16],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus9a.png")
+hist(dt2[,17],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus9b.png")
+hist(dt2[,18],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus10a.png")
+hist(dt2[,19],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus10b.png")
+hist(dt2[,20],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus11a.png")
+hist(dt2[,21],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus11b.png")
+hist(dt2[,22],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus12a.png")
+hist(dt2[,23],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus12b.png")
+hist(dt2[,24],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus13a.png")
+hist(dt2[,25],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus13b.png")
+hist(dt2[,26],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus14a.png")
+hist(dat2[,1],xlim=c(0,110),breaks=100)
+dev.off()
+png("datasaurus14b.png")
+hist(dat2[,2],xlim=c(0,110),breaks=100)
+dev.off()
+
+#########################################
+# Confidence intervals for diagrams	#
+#########################################
+
+Xlim <- c(0,110)
+Ylim <- c(0,110)
+by<-1
+
+supnor.bottle<-function(data,indices){
+ data.extract<-data[indices,]
+ dt.knn.Diag.boot <- gridDiag(X=data.extract, FUN=knnDE, k=100, lim=cbind(Xlim,Ylim), by = by, sublevel=FALSE, library="Dionysus", printProgress=FALSE)
+ bottle<-bottleneck(dt.knn.Diag.boot$diagram, Diag$diagram)
+ return(bottle)
+}
+
+
+
+#########################################
+# Collection of Persistence Norms	#
+#########################################
+
+for(i in 1:x001){
+ x002<-2*i-1
+ x003<-2*i
+ x<-as.data.frame(dt2[,x002:x003]) ### Selects the X and Y variables for the relevant dataset
+ Diag <- ripsDiag(X=x, maxdimension, maxscale, library="GUDHI", printProgress=FALSE)
+   dx1<-as.data.frame(print(Diag[["diagram"]]) )
+   dx1<-dx1[2:nrow(dx1),]
+   if(nrow(dx1)>1){names(dx1)<-c("dim","b","d")
+    dx1$pers<-dx1$d-dx1$b
+    dx1$pers2<-dx1$pers^2
+    dx1<-dx1[!is.na(dx1["pers"]),]
+    dx1a<-subset(dx1,dx1$dim==0)
+    dx1a<-dx1a[-1]
+    dx1b<-subset(dx1,dx1$dim==1)
+    dcol[i,1]<-as.character(dt1t$dataset[i])  # Dataset name
+    dcol[i,2]<-as.numeric(sum(dx1a$pers)) # L01 Norm
+    dcol[i,3]<-sqrt(sum(dx1a$pers2)) # L02 Norm
+    dcol[i,4]<-ifelse(nrow(dx1b)==0,0,sum(dx1b$pers)) # L11 Norm
+    dcol[i,5]<-ifelse(nrow(dx1b)==0,0,sqrt(sum(dx1b$pers2))) # L12 Norm
+    dcol[i,6]<-sd(x[,1])
+    dcol[i,7]<-sd(x[,2])
+    dcol[i,8]<-cor(x[,1],x[,2])
+    dcol[i,9]<-min(x[,1])
+    dcol[i,10]<-max(x[,1])
+    dcol[i,11]<-min(x[,2])
+    dcol[i,12]<-max(x[,2])
+    x004<-nrow(x)-1
+    d001<-0
+    for(j in 1:x004){
+     t1<-x[j,1]
+     t2<-x[j,2]
+     
+     for(k in j:nrow(x)){
+       t3<-x[k,1]
+       t4<-x[k,2]
+       t5<-t3-t1
+       t6<-t4-t2
+       d002<-sqrt(t5^2+t6^2) # distance
+       d001<-ifelse(d002>d001,d002,d001)
+     }
+    }
+    dcol[i,13]<-d001
+   }
+ filename1<-paste0("persistencediag",i,".png")
+ bottle.boot<-boot(data=x, statistic=supnor.bottle, R=100, parallel="multicore",ncpus=8)
+ q95.bottle<-quantile(bottle.boot$t, probs=0.95)
+ png(filename1)
+ plot(Diag$diagram)
+ abline(q95.bottle,1,lty="dotted")
+ dev.off()
+}
+
+# Convert to data frame
+
+dcol<-as.data.frame(dcol)
+names(dcol)<-c("dataset","Dim0L1","Dim0L2","Dim1L1","Dim1L2","SDx1","SDx2","Cor","Minx1","Maxx1","Minx2","Maxx2","MaxDist")
+
+# Conversion to numeric
+
+dcol$Dim0L1<-as.numeric(dcol$Dim0L1)
+dcol$Dim0L2<-as.numeric(dcol$Dim0L2)
+dcol$Dim1L1<-as.numeric(dcol$Dim1L1)
+dcol$Dim1L2<-as.numeric(dcol$Dim1L2)
+dcol$SDx1<-as.numeric(dcol$SDx1)
+dcol$SDx2<-as.numeric(dcol$SDx2)
+dcol$Cor<-as.numeric(dcol$Cor)
+dcol$Minx1<-as.numeric(dcol$Minx1)
+dcol$Maxx1<-as.numeric(dcol$Maxx1)
+dcol$Minx2<-as.numeric(dcol$Minx2)
+dcol$Maxx2<-as.numeric(dcol$Maxx2)
+dcol$MaxDist<-as.numeric(dcol$MaxDist)
+
+# Rounding
+
+dcol$Dim0L1<-round(dcol$Dim0L1,3)
+dcol$Dim0L2<-round(dcol$Dim0L2,3)
+dcol$Dim1L1<-round(dcol$Dim1L1,3)
+dcol$Dim1L2<-round(dcol$Dim1L2,3)
+dcol$SDx1<-round(dcol$SDx1,3)
+dcol$SDx2<-round(dcol$SDx2,3)
+dcol$Cor<-round(dcol$Cor,3)
+dcol$Minx1<-round(dcol$Minx1,3)
+dcol$Maxx1<-round(dcol$Maxx1,3)
+dcol$Minx2<-round(dcol$Minx2,3)
+dcol$Maxx2<-round(dcol$Maxx2,3)
+dcol$MaxDist<-round(dcol$MaxDist,3)
+
+#########################
+# Correlation Matrix	#
+#########################
+
+# As a demonstration of the variation in the metrics we also provide a correlation matrix 
+
+dcol2<-as.data.frame(cbind.data.frame(dcol[,2:5],dcol[,13]))
+
+names(dcol2)<-c("L01","L02","L11","L12","MaxDist")
+
+corm1<-corm(dcol2,3,TRUE)
+
+vars<-c("","L01","L02","L11","L12","MaxDist")
+vars2<-c("L01","L02","L11","L12","MaxDist")
+
+corm2<-as.data.frame(rbind(vars2,corm1))
+corm2<-as.data.frame(cbind(vars,corm2))
+
+
+
+#########################
+# Output as csv and txt	#
+#########################	
+
+write.table(dcol,"DatasaurusPHSummary.csv",sep=",",row.names=FALSE)
+write.table(corm2,"DatasaurusPHCorrelation.csv",sep=",",row.names=FALSE)
+
+
+latout(dcol,"DatasaurusPHSummary.txt")
+latout(corm2,"DatasaurusPHCorrelation.txt")
+
+
+
+latout(dcol,"DatasaurusPHSummary.txt")
+
+#################################
+# SECTION 5.1 TRANSFORMATIONS 	#
+#################################
+
+# Please use the separate file
+
+#################################
+# SECTION 5.2 DISTRIBUTION	#
+#################################
+
+# Loop to collect skewness and kurtosis
+
+dcol3<-as.data.frame(matrix(0,nrow=14,ncol=4))
+
+for(i in 1:14){
+ a002<-2*i
+ a001<-a002-1
+ dcol3[i,1]<-round(skewness(dt2[,a001]),3)
+ dcol3[i,2]<-round(skewness(dt2[,a002]),3)
+ dcol3[i,3]<-round(kurtosis(dt2[,a001]),3)
+ dcol3[i,4]<-round(kurtosis(dt2[,a002]),3)
+}
+
+dcol3<-as.data.frame(cbind.data.frame(dcol$dataset,dcol3)) # Bind dataset names
+
+names(dcol3)<-c("dataset","sk1","sk","kt1","kt") # Provide names
+
+latout(dcol3,"skewkurt.txt") # Table 4 in the paper
+
+# Bind with PH measures
+
+dcol4<-as.data.frame(cbind.data.frame(dcol2,dcol3[,2:5]))
+names(dcol4)<-c("L01","L02","L11","L12","MaxDist","sk1","sk","kt1","kt")
+
+# Compute correlation matrix
+
+corm3<-corm(dcol4,3,TRUE)
+
+# Make labels
+
+vars<-c("","L01","L02","L11","L12","MaxDist","sk1","sk","kt1","kt")
+vars2<-c("L01","L02","L11","L12","MaxDist","sk1","sk","kt1","kt")
+
+# Add labels to correlation matrix
+
+corm4<-as.data.frame(rbind(vars2,corm3))
+corm4<-as.data.frame(cbind(vars,corm4))
+
+latout(corm4,"DatasaurusPHCorrelationSK.txt")
