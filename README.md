@@ -10,4 +10,5 @@ There are two files to recreate the paper:
 References:
 
 Davies, R., Locke, S., & D'Agostino McGowan, L. (2022). datasauRus: Datasets from the Datasaurus Dozen. R package version 0.1.6. https://CRAN.R-project.org/package=datasauRus
+
 Matejka, J., & Fitzmaurice, G. (2017). Same stats, different graphs: generating datasets with varied appearance and identical statistics through simulated annealing. In Proceedings of the 2017 CHI conference on human factors in computing systems (pp. 1290-1294).
