@@ -549,7 +549,7 @@ dcol3<-as.data.frame(cbind.data.frame(dcol$dataset,dcol3)) # Bind dataset names
 
 names(dcol3)<-c("dataset","sk1","sk","kt1","kt") # Provide names
 
-latout(dcol3,"skewkurt.txt") # Table 4 in the paper
+latout(dcol3,"DatasaurusSkewKurt.txt") # Table 4 in the paper
 
 # Bind with PH measures
 
